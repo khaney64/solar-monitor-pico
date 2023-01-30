@@ -193,13 +193,13 @@ if __name__ == "__main__":
     # ina219 at x40
     # ssd1306 at x3C (todo)
     devices = i2c.scan()
-    if len(devices) < 2:
-        print('i2c devices not found')
+    for d in devices:
+        print(f'found {hex(d)}')
+    if len(devices) < 1:
+        print('not all i2c devices found')
         status_blink(4, 1)
     else:
-        for d in devices:
-            print(f'found {hex(d)}')
-            status_blink(4)
+        status_blink(4)
 
     freemem = 0
     while True:

@@ -9,7 +9,7 @@ from _thread import allocate_lock
 from sys import print_exception
 import gc
 from status import Status
-from ina219 import INA219
+from lib.ina219 import INA219
 import logging
 
 lock = allocate_lock()
@@ -72,6 +72,7 @@ def webserver_start(status : Status):
     except KeyboardInterrupt as ke:
         print_exception(ke)
 
+    print('-- webserver shutdown')
     webserver.shutdown()
     
 def fetch_and_write_data(timer : Timer):
@@ -82,41 +83,67 @@ def fetch_and_write_data(timer : Timer):
     
     if timer_fired:
         print('** timer fired, already busy')
+        status_blink(10,.1,.5)
         return
 
-    if freemem != gc.mem_free():
-        freemem = gc.mem_free()
-        if (freemem < 10000):
-            print(f'Memory is below 10K! : {freemem}')
-    gc.collect()
-
-    if status.get_state() != 'monitoring':
-        print(f'** timer fired - not monitoring now')
-        return
-    
-    location, delay = status.get_config()
-    #print(f'** timer fired, monitoring location {location}, delay {delay}')
-    
     timer_fired = True
 
-    # fetch from ina219 here
-    voltage = ina.voltage() # volts
-    current = ina.current() / 1000 # reading is milliamps, convert to amps
-    power = ina.power() / 1000 # reading is milliwatts, convert to watts
-    temperature = status.get_pi_temp()
-    #print(voltage,current,power,temperature)
-
     points = []
-    points.append(Point("voltage",{('location',location),('measurement','voltage'),('units','Volt')},voltage))
-    points.append(Point("current",{('location',location),('measurement','current'),('units','Amp')},current))
-    points.append(Point("power",{('location',location),('measurement','power'),('units','Watt')},power))
-    points.append(Point("temperature",{('location',location),('measurement','temperature'),('units','Fahrenheit')},temperature))
-    if status.influxdbclient.write_with_retry(points, tries=1, delay=1):
-        count = status.increment_counter()
-        if count % 25 == 0:
-            print(f'++ Recorded {count} records')
+    try:
+        if freemem != gc.mem_free():
+            freemem = gc.mem_free()
+            if (freemem < 50000):
+                print(f'Memory is below 50K! : {freemem}')
+        gc.collect()
+        #print(f'** gc collect end {freemem}')
+
+        if status.get_state() != 'monitoring':
+            print(f'** timer fired - not monitoring now')
+            timer_fired = False
+            return
         
-    timer_fired = False
+        location, delay = status.get_config()
+        now = localtime()
+
+        print(f'** {now[3]}:{now[4]}:{now[5]} : timer fired, monitoring location {location}, delay {delay}')
+        
+        # fetch from ina219 here
+        #print('getting ina #s')
+        diode_drop = .2
+        voltage = ina.voltage() + diode_drop # volts
+        current = ina.current() / 1000 # reading is amps, convert to milliamps
+        power = ina.power() / 1000 # reading is watts, convert to milliwatts
+        #print('getting temp')
+        temperature = status.get_pi_temp()
+        #print(ina.voltage(),ina.current(),ina.power())
+        #print(voltage,current,power,temperature)
+
+        #print('getting vsys')
+        #vsys, percentage = status.get_battery_voltage(3.0, 4.2, adc_channel=3)
+        vsys, percentage = status.get_vsys_adc2(3.0,4.2)
+        #print(vsys,percentage)
+
+        points.append(Point("voltage",{('location',location),('measurement','voltage'),('units','Volt')},voltage))
+        points.append(Point("current",{('location',location),('measurement','current'),('units','Amp')},current))
+        points.append(Point("power",{('location',location),('measurement','power'),('units','Watt')},power))
+        points.append(Point("temperature",{('location',location),('measurement','temperature'),('units','Fahrenheit')},temperature))
+        points.append(Point("vsys",{('location',location),('measurement','vsys'),('units','Volt')},vsys))
+        points.append(Point("battery",{('location',location),('measurement','battery'),('units','Percent')},percentage))
+        points.append(Point("freemem",{('location',location),('measurement','freemem'),('units','Byte')},freemem))
+
+        #print(f'influx write start {status.get_data_count()}')
+        if status.influxdbclient.write_with_retry(points, tries=1, delay=1):
+            count = status.increment_counter()
+            if count % 100 == 0:
+                print(f'++ Recorded {count} records')
+        #print(f'influx write end {status.get_data_count()}')
+        status.status_blink(1)
+
+    except Exception as e:
+        print_exception(e)
+    finally:
+        timer_fired = False
+        points = None
     return
 
 def status_blink(count : int = 1, toggle_delay : float = .2, end_delay : float = 2):
@@ -179,8 +206,8 @@ if __name__ == "__main__":
     timer_fired = False
     timer = Timer()
 
-    sda = Pin(26)
-    scl = Pin(27)
+    sda = Pin(10)
+    scl = Pin(11)
     i2c = I2C(1, sda=sda, scl=scl, freq=400000)
 
     I2C_INTERFACE_NO = 1
@@ -202,11 +229,15 @@ if __name__ == "__main__":
         status_blink(4)
 
     freemem = 0
+    
     while True:
         status_blink(5)
+        print('-- starting webserver')
         webserver_start(status)
         # webserver should run forever unless it crashes.
         # we do want to restart it, but may need to clean some things up (or start  might not work)
         print('-- stopping timer')
         timer.deinit()
-        sleep(5)
+        sleep(10)
+
+    

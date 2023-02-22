@@ -103,7 +103,6 @@ class Formatter:
             "levelname": record.levelname,
         }
 
-
 class Logger:
     def __init__(self, name, level=NOTSET):
         self.name = name

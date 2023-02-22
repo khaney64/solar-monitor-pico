@@ -1,7 +1,8 @@
 import urequests
 from time import sleep
+from sys import print_exception
 
-from debug_print import print_, print_exception_
+#from debug_print import print_, print_exception_
 
 class Point:
     def __init__(self, measurement, tags, value):
@@ -31,13 +32,13 @@ class InfluxApiClient:
         request = self.url + '/api/v2/write?org=' + self.organization + '&bucket=' + self.bucket + '&precision=ns'
         data = '\n'.join(str(p) for p in points)
 
-        #print_(headers)
-        #print_(request)
-        #print_(data)
+        #print(headers)
+        #print(request)
+        #print(data)
         
         response = urequests.post(request, headers=headers, data=data)
         if response.status_code != 204:
-            print_(f'influxdb write failed {response.status_code} : {response.reason}\n{response.text}')
+            print(f'influxdb write failed {response.status_code} : {response.reason}\n{response.text}')
         return response
     
     def write_with_retry(self, data : list[Point], tries : int, delay : int):
@@ -48,13 +49,12 @@ class InfluxApiClient:
                 attempts = attempts + 1
                 self.write_data(data)
                 success = True
-                break
             except Exception as e:
-                print_exception_(e)
-                print_(f"Write failed, attempt {attempts} of {tries} waiting {delay}") # add signal strength if we find a faster way to getit
+                print_exception(e)
+                print(f"Write failed, attempt {attempts} of {tries} waiting {delay}") # add signal strength if we find a faster way to getit
                 sleep(delay)
         if not success:
-            print_(f"data lost after {tries} retries")
+            print(f"data lost after {tries} retries")
             return False
         else:
             return True
@@ -71,8 +71,8 @@ if __name__ == "__main__":
 
     wifi = Wifi(ssid,password)
     wifi.start()
-    print_(wifi.ipaddress)
-    print_(wifi.status())
+    print(wifi.ipaddress)
+    print(wifi.status())
 
     client = InfluxApiClient(influxdb_secrets['url'],influxdb_secrets['organization'],influxdb_secrets['bucket'],influxdb_secrets['token'])
     points = []
@@ -81,9 +81,9 @@ if __name__ == "__main__":
     points.append(Point("power",{('location','test'),('measurement','power'),('units','Watt')},1.5))
 
     r = client.write_data(points)
-    print_(r)
-    print_(r.text)
-    print_(r.content)
-    print_(r.status_code)
-    print_(r.reason)
+    print(r)
+    print(r.text)
+    print(r.content)
+    print(r.status_code)
+    print(r.reason)
     r.close()

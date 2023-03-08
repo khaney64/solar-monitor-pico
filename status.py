@@ -174,7 +174,7 @@ class Status:
     #
     # AA 1.35 to 1.5 volts (x3 = 4.05 to 4.5)
     # 3.75v Li 3.0 to 4.2
-    def get_vsys_adc2(self, min : float, max : float, samples : int = 3) -> tuple[float, float]:
+    def get_vsys_adc2(self, min : float, max : float, diode_drop : int = .2, samples : int = 3) -> tuple[float, float]:
         self.lock.acquire()
         try:
             vsys = ADC(2)
@@ -184,7 +184,9 @@ class Status:
             raw = vsys.read_u16()
             ground = gnd.read_u16()
             vdivider = (raw - ground) * 3.3 / (1 << 16)
+            vdivider += diode_drop
             voltage = (raw - ground) * conversion_factor
+            voltage += diode_drop
             #print(f'adc2 - raw vsys = {raw}, raw around = {ground}, factor = {conversion_factor}, voltage = {voltage}, divider = {vdivider}')
             percentage = 100 * ((voltage - min) / (max - min))
             if percentage > 100:

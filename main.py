@@ -18,12 +18,14 @@ def handle_request(request : Request, status : Status) -> str:
     #print('web request')
     #print(request.verb, request.command)
     global timer
+    global ina
     
     command = request.command.lower()
     if command == "/start":
         if status.get_state() == 'waiting':
             status.update_state('monitoring')
             status.reset_counter()
+            ina.wake()
             location, delay = status.get_config()
             timer.init(period=delay*1000, mode=Timer.PERIODIC, callback=fetch_and_write_data)
             #start_new_thread(monitor_thread,(status,))
@@ -34,6 +36,7 @@ def handle_request(request : Request, status : Status) -> str:
         if status.get_state() == 'monitoring':
             status.update_state('waiting')
             timer.deinit()
+            ina.sleep()
             print(f'---- Stop monitoring request, logged {status.get_data_count()} data points')
             status_blink(3)
         
@@ -109,7 +112,7 @@ def fetch_and_write_data(timer : Timer):
         
         # fetch from ina219 here
         #print('getting ina #s')
-        diode_drop = .2
+        diode_drop = .8 # need to put a .2 diode in here
         voltage = ina.voltage() + diode_drop # volts
         current = ina.current() / 1000 # reading is amps, convert to milliamps
         power = ina.power() / 1000 # reading is watts, convert to milliwatts
@@ -227,6 +230,8 @@ if __name__ == "__main__":
         status_blink(4, 1)
     else:
         status_blink(4)
+
+    ina.sleep()
 
     freemem = 0
     

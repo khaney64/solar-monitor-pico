@@ -36,4 +36,16 @@ secrets.py config file should contain the following information to define the wi
 >}
 
 **screenshots**:
-todo - add screenshots 
+Here is the assembled monitor:
+![monitor](/screenshots/monitor-1.png)
+
+Solar input side.  button currently not used, but will likely be used to toggle the display (todo):
+![inside](/screenshots/monitor-2.png)
+
+Power input side.  The device doesn't draw as much power as the original Pi Zero version, so the USB battery I was using kept shutting off.
+I added a JST power connector, so it can be powered that way, or via the USB connector:
+![inside](/screenshots/monitor-3.png)
+
+Using the JST power connector with ![3.7v 2200 mAh LiPo battery](https://www.adafruit.com/product/1781#tutorials) :
+![inside](/screenshots/monitor-4.png)
+
